@@ -16,14 +16,19 @@ function hotp(secretHex: string, counter: bigint): number {
   return code % 1_000_000
 }
 
-export function verifyTotp(secretHex: string, token: string, window = 1): boolean {
+/**
+ * Vérifie un token TOTP.
+ * Renvoie le compteur qui a correspondu (pour l'anti-rejeu), ou null si invalide.
+ */
+export function verifyTotp(secretHex: string, token: string, window = 1): bigint | null {
   const code = parseInt(token, 10)
-  if (isNaN(code)) return false
+  if (isNaN(code)) return null
 
   const counter = BigInt(Math.floor(Date.now() / 1000 / 30))
 
   for (let i = -window; i <= window; i++) {
-    if (hotp(secretHex, counter + BigInt(i)) === code) return true
+    const c = counter + BigInt(i)
+    if (hotp(secretHex, c) === code) return c
   }
-  return false
+  return null
 }
