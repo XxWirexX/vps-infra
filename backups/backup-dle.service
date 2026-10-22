@@ -1,0 +1,7 @@
+[Unit]
+Description=Sauvegarde de la base DLE
+
+[Service]
+Type=oneshot
+User=debian
+ExecStart=/home/debian/infra/backups/backup-dle.sh
