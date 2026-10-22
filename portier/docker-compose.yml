@@ -1,0 +1,18 @@
+services:
+  portier:
+    build: .
+    container_name: portier
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.portier.rule=Host(`auth.wireredblue.xyz`)
+      - traefik.http.routers.portier.entrypoints=websecure
+      - traefik.http.services.portier.loadbalancer.server.port=3000
+      - traefik.http.middlewares.portier.forwardauth.address=http://portier:3000/verify
+
+networks:
+  proxy:
+    external: true
