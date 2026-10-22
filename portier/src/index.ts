@@ -8,14 +8,20 @@ import { verifyTotp } from './totp.js'
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const COOKIE_NAME         = 'session'
 const MAX_FAILURES        = 5
-const LOCKOUT_MS          = 5 * 60 * 1000
+const LOCKOUT_MS_MIN      = 5  * 60 * 1000   //  5 min — premier blocage
+const LOCKOUT_MS_MAX      = 24 * 60 * 60 * 1000  // 24 h — plafond
 const AUTH_BASE_URL       = 'https://auth.wireredblue.xyz'
 const DEFAULT_REDIRECT    = 'https://wireredblue.xyz'
 
 // ── État en mémoire ───────────────────────────────────────────────────────────
 
 let lastUsedCounter: bigint | null = null
-const rateLimit = { failures: 0, lockedUntil: 0 }
+
+/**
+ * Backoff progressif : lockoutMs double à chaque blocage (5 min → 10 → 20 → … → 24 h).
+ * Ne se réinitialise qu'après une connexion réussie.
+ */
+const rateLimit = { failures: 0, lockedUntil: 0, lockoutMs: LOCKOUT_MS_MIN }
 
 // ── Sécurité : validation de l'URL de redirection ────────────────────────────
 
@@ -27,6 +33,28 @@ const rateLimit = { failures: 0, lockedUntil: 0 }
  *   - "evilwireredblue.xyz"        → se termine par "wireredblue.xyz" MAIS pas ".wireredblue.xyz" ✗
  *   - "wireredblue.xyz.pirate.com" → se termine par ".pirate.com", pas ".wireredblue.xyz" ✗
  */
+/** Échappe les 5 caractères HTML dangereux — protège contre les XSS dans les templates. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
+/** Envoie une alerte ntfy si NTFY_URL est défini dans .env. Fire-and-forget. */
+function notifyLockout(lockoutMs: number): void {
+  const url = process.env.NTFY_URL
+  if (!url) return
+  const minutes = Math.round(lockoutMs / 60_000)
+  fetch(url, {
+    method: 'POST',
+    body: `Portier : ${MAX_FAILURES} tentatives échouées — accès verrouillé ${minutes} min`,
+    headers: { Title: 'Tentative de connexion bloquée', Priority: 'high' },
+  }).catch(e => console.error('ntfy:', e))
+}
+
 function isSafeRedirect(rd: string): boolean {
   try {
     const { hostname, protocol } = new URL(rd)
@@ -98,6 +126,8 @@ const alreadyConnectedPage = () => `<!DOCTYPE html>
 
 const loginPage = (opts: { rd?: string; error?: string; retryAfter?: number }) => {
   const { rd = '', error, retryAfter } = opts
+  const safeRdAttr  = escapeHtml(rd)
+  const safeError   = error ? escapeHtml(error) : null
   const locked = (retryAfter ?? 0) > 0
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -146,10 +176,10 @@ const loginPage = (opts: { rd?: string; error?: string; retryAfter?: number }) =
     <h1>Authentification</h1>
     <p class="hint">Entrez le code à 6 chiffres<br>généré par votre application TOTP.</p>
 
-    ${error ? `<div class="error">${error}</div>` : ''}
+    ${safeError ? `<div class="error">${safeError}</div>` : ''}
 
     <form method="POST" action="/login" id="form">
-      <input type="hidden" name="rd" value="${rd.replace(/"/g, '&quot;')}" />
+      <input type="hidden" name="rd" value="${safeRdAttr}" />
       <div class="otp-inputs">
         ${[0,1,2,3,4,5].map(i => `<input
           type="text" inputmode="numeric" maxlength="1" pattern="[0-9]"
@@ -292,12 +322,14 @@ app.post('/login', async (c) => {
   if (counter === null) {
     rateLimit.failures++
     if (rateLimit.failures >= MAX_FAILURES) {
-      rateLimit.lockedUntil = Date.now() + LOCKOUT_MS
+      rateLimit.lockedUntil = Date.now() + rateLimit.lockoutMs
+      rateLimit.lockoutMs   = Math.min(rateLimit.lockoutMs * 2, LOCKOUT_MS_MAX)
       rateLimit.failures    = 0
-      const retryAfter = Math.ceil(LOCKOUT_MS / 1000)
+      notifyLockout(rateLimit.lockoutMs)
+      const retryAfter = Math.ceil((rateLimit.lockedUntil - Date.now()) / 1000)
       return c.html(loginPage({
         rd,
-        error: `Trop de tentatives. Réessayez dans ${retryAfter}s.`,
+        error: `Trop de tentatives. Réessayez dans ${Math.round(retryAfter / 60)} min.`,
         retryAfter,
       }), 429)
     }
@@ -314,10 +346,11 @@ app.post('/login', async (c) => {
     return c.html(loginPage({ rd, error: 'Code déjà utilisé.' }), 401)
   }
 
-  // 5. Succès
+  // 5. Succès — réinitialisation complète du rateLimit (y compris le backoff)
   lastUsedCounter       = counter
   rateLimit.failures    = 0
   rateLimit.lockedUntil = 0
+  rateLimit.lockoutMs   = LOCKOUT_MS_MIN
 
   const payload = JSON.stringify({ exp: Date.now() + SESSION_DURATION_MS })
   const domain  = process.env.COOKIE_DOMAIN || undefined
