@@ -4,6 +4,8 @@ services:
     container_name: portier
     restart: unless-stopped
     env_file: .env
+    volumes:
+      - passkeys:/app/data
     networks:
       - proxy
     labels:
@@ -12,6 +14,9 @@ services:
       - traefik.http.routers.portier.entrypoints=websecure
       - traefik.http.services.portier.loadbalancer.server.port=3000
       - traefik.http.middlewares.portier.forwardauth.address=http://portier:3000/verify
+
+volumes:
+  passkeys:
 
 networks:
   proxy:
