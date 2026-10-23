@@ -1,7 +1,8 @@
 [Unit]
-Description=Sauvegarde de la base DLE
+Description=Sauvegardes quotidiennes (base DLE + état du panel admin)
 
 [Service]
 Type=oneshot
 User=debian
 ExecStart=/home/debian/infra/backups/backup-dle.sh
+ExecStart=/home/debian/infra/backups/backup-admin.sh
