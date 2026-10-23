@@ -1,0 +1,9 @@
+# Service partagé : la page de maintenance en 503 (port 8080 du conteneur maintenance).
+# Pour mettre un site en maintenance, on ajoute une route prioritaire vers ce service
+# (voir traefik/examples/maintenance-site.yml).
+http:
+  services:
+    maintenance-503:
+      loadBalancer:
+        servers:
+          - url: http://maintenance:8080

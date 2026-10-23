@@ -10,3 +10,5 @@ acme.json
 data/
 *.dump
 .idea
+# Maintenance par site : fichiers créés/supprimés sur le serveur (plus tard par le panel)
+traefik/dynamic/maintenance-*.yml

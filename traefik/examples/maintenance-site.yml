@@ -1,0 +1,11 @@
+# Exemple : mettre dle.wireredblue.xyz en maintenance.
+# Copier dans traefik/dynamic/maintenance-dle.yml sur le serveur -> effet immédiat.
+# Supprimer le fichier -> le site revient, sans redémarrage.
+# (Les fichiers maintenance-*.yml sont ignorés par Git : c'est l'état du serveur, pas de la config.)
+http:
+  routers:
+    maintenance-dle:
+      rule: Host(`dle.wireredblue.xyz`)
+      entryPoints: [websecure]
+      service: maintenance-503
+      priority: 10000

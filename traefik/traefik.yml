@@ -20,6 +20,11 @@ providers:
   docker:
     exposedByDefault: false
     network: proxy
+  # Routes gérées par fichiers (sous-domaines, maintenance par site).
+  # Traefik surveille le dossier et recharge à chaud, sans redémarrage.
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
 
 certificatesResolvers:
   letsencrypt:
