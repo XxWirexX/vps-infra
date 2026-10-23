@@ -1,0 +1,31 @@
+services:
+  admin:
+    build: .
+    container_name: admin
+    restart: unless-stopped
+    # Même uid/gid que l'utilisateur debian du serveur (vérifier avec `id debian`)
+    user: "1000:1000"
+    environment:
+      NUXT_DOMAIN: wireredblue.xyz
+      NUXT_PUBLIC_DOMAIN: wireredblue.xyz
+      NUXT_ALLOWED_ORIGIN: https://admin.wireredblue.xyz
+      NUXT_DYNAMIC_DIR: /data/traefik-dynamic
+      NUXT_FLAGS_DIR: /data/flags
+      NUXT_STATE_FILE: /data/state/sites.json
+    volumes:
+      # Les seuls dossiers que le panel peut modifier. Pas de socket Docker.
+      - ../traefik/dynamic:/data/traefik-dynamic
+      - ../maintenance/flags:/data/flags
+      - ./data:/data/state
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.admin.rule=Host(`admin.wireredblue.xyz`)
+      - traefik.http.routers.admin.entrypoints=websecure
+      - traefik.http.routers.admin.middlewares=portier@docker
+      - traefik.http.services.admin.loadbalancer.server.port=3000
+
+networks:
+  proxy:
+    external: true

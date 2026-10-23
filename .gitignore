@@ -12,3 +12,5 @@ data/
 .idea
 # Maintenance par site : fichiers créés/supprimés sur le serveur (plus tard par le panel)
 traefik/dynamic/maintenance-*.yml
+# Routes des sites générées par le panel admin (l'état est dans admin/data/sites.json)
+traefik/dynamic/site-*.yml

@@ -1,0 +1,66 @@
+:root {
+  --bg: #0f0f0f;
+  --panel: #161616;
+  --card: #1a1a1a;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+  --text: #e0e0e0;
+  --text-strong: #fff;
+  --muted: #777;
+  --accent: #4f8ef7;
+  --accent-hover: #3a7de0;
+  --ok: #4ade80;
+  --warn: #f5b041;
+  --danger: #f87171;
+  --danger-bg: #2d1515;
+  --radius: 10px;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: inherit; }
+code, .mono { font-family: var(--mono); font-size: 0.85em; }
+
+button { font: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: #222; color: var(--text);
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover:not(:disabled) { background: #2a2a2a; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-danger { color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: var(--danger-bg); border-color: #5c2020; }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 0.4rem 0.6rem; }
+.btn-ghost:hover:not(:disabled) { background: #222; color: var(--text); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input[type="text"], input[type="number"] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: #111; color: var(--text-strong);
+  font: inherit;
+}
+input:focus { outline: none; border-color: var(--accent); }
+input:disabled { opacity: 0.6; }
