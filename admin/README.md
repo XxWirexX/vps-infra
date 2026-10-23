@@ -6,10 +6,12 @@
 - **Maintenance par site** : envoie le site vers la page 503, instantanément.
 - **Filet de sécurité** : bascule les domaines sans site entre 404 et maintenance.
 - **État** : vérifie toutes les 30 s que chaque conteneur répond.
+- **Nouveau projet** : repo GitHub, clés, CD et premier déploiement en un clic, via l'agent du serveur (voir `agent/README.md`).
 
 ## Fonctionnement
 
-Le panel ne touche ni à Docker ni aux conteneurs. Il écrit seulement des fichiers :
+Le panel ne touche ni à Docker ni aux conteneurs. Pour créer un projet, il passe par l'agent
+(socket Unix `agent/run/agent.sock`). Pour le reste, il écrit seulement des fichiers :
 
 | Ce qu'il écrit | Dossier sur le serveur | Lu par |
 |---|---|---|
