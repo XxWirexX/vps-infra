@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     dynamicDir: '/data/traefik-dynamic',
     flagsDir: '/data/flags',
     stateFile: '/data/state/sites.json',
+    agentSocket: '/run/agent/agent.sock',
     public: {
       domain: 'wireredblue.xyz',
     },

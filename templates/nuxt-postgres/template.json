@@ -1,0 +1,1 @@
+{ "label": "Nuxt + Postgres", "description": "Comme DLE : Nuxt, base Postgres et migrations Drizzle", "port": 3000 }

@@ -12,11 +12,14 @@ services:
       NUXT_DYNAMIC_DIR: /data/traefik-dynamic
       NUXT_FLAGS_DIR: /data/flags
       NUXT_STATE_FILE: /data/state/sites.json
+      NUXT_AGENT_SOCKET: /run/agent/agent.sock
     volumes:
       # Les seuls dossiers que le panel peut modifier. Pas de socket Docker.
       - ../traefik/dynamic:/data/traefik-dynamic
       - ../maintenance/flags:/data/flags
       - ./data:/data/state
+      # Socket de l'agent : la seule façon pour le panel de demander une action sur le serveur
+      - ../agent/run:/run/agent
     networks:
       - proxy
     labels:

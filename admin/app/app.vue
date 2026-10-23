@@ -96,6 +96,18 @@ async function onSaved() {
   notify(wasEdit ? 'Site mis à jour.' : 'Site ajouté.')
 }
 
+// ── Nouveau projet ──
+const projectOpen = ref(false)
+async function onProjectCreated() {
+  await refreshSites()
+  refreshHealth()
+}
+async function onProjectClosed() {
+  projectOpen.value = false
+  await refreshSites()
+  refreshHealth()
+}
+
 function healthOf(site: SiteRow) {
   return health.value[site.id]
 }
@@ -131,12 +143,15 @@ function healthOf(site: SiteRow) {
     <section>
       <div class="section-head">
         <h2>Sites <span class="count">{{ sites.length }}</span></h2>
-        <button class="btn btn-primary" @click="openForm()">+ Ajouter un site</button>
+        <div class="head-actions">
+          <button class="btn" @click="openForm()">+ Site existant</button>
+          <button class="btn btn-primary" @click="projectOpen = true">+ Nouveau projet</button>
+        </div>
       </div>
 
       <div v-if="!sites.length" class="empty">
         <p>Aucun site géré par le panel pour l'instant.</p>
-        <p class="hint">Ajoute un site pour lui attribuer un sous-domaine : la route est créée dans Traefik instantanément.</p>
+        <p class="hint">Crée un nouveau projet, ou ajoute un conteneur existant pour lui attribuer un sous-domaine.</p>
       </div>
 
       <ul v-else class="sites">
@@ -177,6 +192,7 @@ function healthOf(site: SiteRow) {
     </section>
 
     <SiteForm v-if="formOpen" :site="editing" @saved="onSaved" @close="formOpen = false" />
+    <ProjectForm v-if="projectOpen" @created="onProjectCreated" @close="onProjectClosed" />
 
     <Transition name="toast">
       <div v-if="toast" class="toast" :class="{ error: toast.error }" role="status">{{ toast.message }}</div>
@@ -207,7 +223,8 @@ h2 { font-size: 1rem; color: var(--text-strong); font-weight: 600; }
 .global.active { border-color: rgba(245, 176, 65, 0.5); }
 .global.active strong { color: var(--warn); }
 
-.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.head-actions { display: flex; gap: 0.5rem; }
 .count {
   margin-left: 0.35rem; padding: 0.05rem 0.5rem; border-radius: 999px;
   background: #222; color: var(--muted); font-size: 0.8rem; font-weight: 500;

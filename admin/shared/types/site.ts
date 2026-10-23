@@ -24,3 +24,21 @@ export interface SiteHealth {
   status?: number
   ms?: number
 }
+
+/** Modèle de projet proposé par l'agent */
+export interface ProjectTemplate {
+  id: string
+  label: string
+  description: string
+  port: number
+}
+
+/** Avancement d'une création de projet */
+export interface ProjectJob {
+  id: string
+  project: string
+  status: 'running' | 'done' | 'failed'
+  log: string[]
+  result: { repo: string; clone: string; host: string } | null
+  error: string | null
+}
