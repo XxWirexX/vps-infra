@@ -57,7 +57,7 @@ onMounted(() => dialog.value?.showModal())
 <template>
   <dialog ref="dialog" class="dialog" @close="emit('close')" @click.self="dialog?.close()">
     <form class="body" @submit.prevent="submit">
-      <h2>{{ isEdit ? `Modifier « ${site!.name} »` : 'Ajouter un site' }}</h2>
+      <h2>{{ isEdit ? `Modifier « ${site!.name} »` : 'Ajouter un site existant' }}</h2>
 
       <label>
         <span>Nom</span>

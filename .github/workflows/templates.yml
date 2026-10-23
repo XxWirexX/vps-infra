@@ -1,0 +1,29 @@
+name: Modèles de projet
+
+# Construit chaque modèle exactement comme le fera le serveur (docker build),
+# pour qu'un modèle cassé (lockfile désynchronisé, Dockerfile faux…) soit repéré
+# ici, et pas au moment de créer un projet depuis le panel.
+on:
+  push:
+    paths: ["templates/**", ".github/workflows/templates.yml"]
+  pull_request:
+    paths: ["templates/**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [static, nuxt, nuxt-postgres, hono]
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker build ${{ matrix.template }}
+        run: |
+          target=""
+          if grep -q "AS runtime" templates/${{ matrix.template }}/Dockerfile; then target="--target runtime"; fi
+          docker build $target templates/${{ matrix.template }}
+      - name: image de migration
+        if: matrix.template == 'nuxt-postgres'
+        run: docker build --target migrate templates/nuxt-postgres
