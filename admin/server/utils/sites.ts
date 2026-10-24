@@ -81,6 +81,17 @@ export function parseSiteInput(body: unknown, sites: Site[], currentId?: string)
   return input
 }
 
+/** Valide nom et identifiant d'un projet sans web (pas de sous-domaine ni de conteneur à vérifier). */
+export function parseProjectIdentity(body: unknown, sites: Site[]): { id: string; name: string } {
+  const b = (body ?? {}) as Record<string, unknown>
+  const name = typeof b.name === 'string' ? b.name.trim() : ''
+  if (!name || name.length > 60) throw createError({ statusCode: 400, message: 'Le nom doit faire entre 1 et 60 caractères.' })
+  const id = typeof b.id === 'string' ? b.id.trim().toLowerCase() : ''
+  if (!ID_RE.test(id)) throw createError({ statusCode: 400, message: 'Identifiant invalide : 1 à 32 caractères, minuscules, chiffres et tirets.' })
+  if (sites.some((s) => s.id === id)) throw createError({ statusCode: 400, message: `L'identifiant « ${id} » est déjà utilisé par un site.` })
+  return { id, name }
+}
+
 // ── État (sites.json) ─────────────────────────────────────────────────────────
 
 export async function loadSites(): Promise<Site[]> {

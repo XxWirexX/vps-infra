@@ -21,7 +21,8 @@ jamais de commande libre.
 7. Pousse le code, configure le remote SSH avec la deploy key
 8. Lance le premier déploiement (`deploy/deploy.sh <id>`)
 
-De son côté, le panel crée la route `site-<id>.yml` vers le conteneur `<id>`.
+De son côté, le panel crée la route `site-<id>.yml` vers le conteneur `<id>`, sauf pour le modèle
+**Programme (sans web)** : pas de sous-domaine, il démarre avec un compose de démo à remplacer.
 Ensuite, chaque push sur `main` redéploie le projet tout seul.
 
 ## Installation

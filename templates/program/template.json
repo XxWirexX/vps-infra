@@ -1,0 +1,5 @@
+{
+  "label": "Programme (sans web)",
+  "description": "Bot, worker, script… un compose de démo à remplacer, sans sous-domaine",
+  "web": false
+}

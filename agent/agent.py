@@ -78,7 +78,9 @@ def list_templates() -> list[dict]:
             "id": path.name,
             "label": meta.get("label", path.name),
             "description": meta.get("description", ""),
-            "port": int(meta.get("port", 80)),
+            "port": int(meta.get("port") or 0),
+            # web = false : pas de sous-domaine ni de route (bot, worker, script…)
+            "web": bool(meta.get("web", True)),
         })
     return templates
 
@@ -198,14 +200,16 @@ def gh_env() -> dict[str, str]:
     return {"GH_TOKEN": GH_TOKEN, "GH_PROMPT_DISABLED": "1"}
 
 
-def create_project(job: Job, project_id: str, name: str, template: str, subdomain: str) -> None:
+def create_project(job: Job, project_id: str, name: str, template: str, subdomain: str | None) -> None:
     repo = f"{GH_OWNER}/{project_id}"
-    host = f"{subdomain}.{DOMAIN}" if subdomain else DOMAIN
+    # subdomain None = projet sans web (aucune route)
+    host = None if subdomain is None else (f"{subdomain}.{DOMAIN}" if subdomain else DOMAIN)
     project_dir = PROJECTS_DIR / project_id
     done: list[str] = []
 
     try:
-        job.write(f"▶ Création de {name} ({template}) sur https://{host}")
+        where = f" sur https://{host}" if host else " (sans web)"
+        job.write(f"▶ Création de {name} ({template}){where}")
         if DRY_RUN:
             job.write("  Mode dry-run : GitHub et Docker ne seront pas touchés.")
 
@@ -229,7 +233,7 @@ def create_project(job: Job, project_id: str, name: str, template: str, subdomai
         render_tree(project_dir, {
             "__PROJECT_ID__": project_id,
             "__PROJECT_NAME__": name,
-            "__PROJECT_HOST__": host,
+            "__PROJECT_HOST__": host or "",
         })
         generated = write_env(project_dir)
         if generated:
@@ -306,7 +310,7 @@ def create_project(job: Job, project_id: str, name: str, template: str, subdomai
             "clone": f"git clone git@github.com:{repo}.git",
             "host": host,
         }
-        job.write(f"✔ {name} est prêt : https://{host}")
+        job.write(f"✔ {name} est prêt" + (f" : https://{host}" if host else ""))
         job.status = "done"
     except Exception as err:  # noqa: BLE001 — tout échec doit finir dans le journal
         message = str(err) if isinstance(err, AgentError) else f"Erreur inattendue : {err}"
@@ -322,6 +326,7 @@ def create_project(job: Job, project_id: str, name: str, template: str, subdomai
 
 
 def start_create(body: dict) -> Job:
+    subdomain: str | None
     project_id = str(body.get("id", "")).strip().lower()
     name = str(body.get("name", "")).strip()
     template = str(body.get("template", "")).strip()
@@ -331,9 +336,12 @@ def start_create(body: dict) -> Job:
         raise AgentError("Identifiant invalide.")
     if not name or len(name) > 60 or any(c in name for c in "\r\n\0"):
         raise AgentError("Nom invalide.")
-    if template not in {t["id"] for t in list_templates()}:
+    meta = next((t for t in list_templates() if t["id"] == template), None)
+    if meta is None:
         raise AgentError("Modèle inconnu.")
-    if subdomain and not SUBDOMAIN_RE.match(subdomain):
+    if not meta["web"]:
+        subdomain = None
+    elif subdomain and not SUBDOMAIN_RE.match(subdomain):
         raise AgentError("Sous-domaine invalide.")
     if not CREATE_LOCK.acquire(blocking=False):
         raise AgentError("Une création de projet est déjà en cours, réessaie dans un instant.")

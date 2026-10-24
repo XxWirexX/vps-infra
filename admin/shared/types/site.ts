@@ -31,6 +31,8 @@ export interface ProjectTemplate {
   label: string
   description: string
   port: number
+  /** false : programme sans web (pas de sous-domaine ni de route) */
+  web: boolean
 }
 
 /** Avancement d'une création de projet */
@@ -39,6 +41,6 @@ export interface ProjectJob {
   project: string
   status: 'running' | 'done' | 'failed'
   log: string[]
-  result: { repo: string; clone: string; host: string } | null
+  result: { repo: string; clone: string; host: string | null } | null
   error: string | null
 }

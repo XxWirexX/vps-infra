@@ -15,5 +15,8 @@ Dans `.env.example`, chaque `__SECRET_<NOM>__` devient une valeur aléatoire dan
 du serveur (le même nom donne la même valeur partout dans le fichier). Le `.env.example`
 commité garde un texte à la place.
 
-`template.json` décrit le modèle pour le panel (nom, description, port de l'application).
-Le conteneur exposé doit s'appeler `__PROJECT_ID__` et être sur le réseau `proxy`.
+`template.json` décrit le modèle pour le panel : nom, description, port de l'application,
+et `"web": false` pour un programme sans interface web (pas de sous-domaine ni de route).
+
+Pour un modèle web, le conteneur exposé doit s'appeler `__PROJECT_ID__` et être sur le réseau `proxy`.
+Pour `program/`, `__PROJECT_HOST__` est remplacé par une chaîne vide.

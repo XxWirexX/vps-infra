@@ -34,6 +34,8 @@ watch(() => form.name, (name) => {
   if (!idTouched.value) form.id = slug
   if (!subTouched.value) form.subdomain = slug
 })
+const selected = computed(() => templates.value.find((t) => t.id === form.template))
+const isWeb = computed(() => selected.value?.web !== false)
 const preview = computed(() => (form.subdomain ? `${form.subdomain}.${domain}` : domain))
 
 const submitting = ref(false)
@@ -122,7 +124,7 @@ function close() {
           </label>
         </div>
 
-        <label>
+        <label v-if="isWeb">
           <span>Sous-domaine <small>— vide pour la racine</small></span>
           <div class="suffix">
             <input v-model="form.subdomain" type="text" maxlength="63" @input="subTouched = true">
@@ -130,6 +132,10 @@ function close() {
           </div>
           <span class="hint mono">→ https://{{ preview }}</span>
         </label>
+        <p v-else class="hint">
+          Pas de sous-domaine : le programme n'est pas exposé sur le web. Il démarre avec un
+          <code>docker-compose.yml</code> de démo, à remplacer par le tien (le README du repo explique comment).
+        </p>
 
         <p class="hint">
           L'agent crée le repo privé <code>{{ form.id || '…' }}</code> sur GitHub, les clés de déploiement,
@@ -157,7 +163,7 @@ function close() {
       <pre ref="logBox" class="log">{{ job.log.join('\n') || '…' }}</pre>
 
       <div v-if="job.result" class="success">
-        <p>En ligne sur <a :href="`https://${job.result.host}`" target="_blank" rel="noopener">https://{{ job.result.host }}</a></p>
+        <p v-if="job.result.host">En ligne sur <a :href="`https://${job.result.host}`" target="_blank" rel="noopener">https://{{ job.result.host }}</a></p>
         <p>Sur ton PC :</p>
         <div class="clone">
           <code>{{ job.result.clone }}</code>

@@ -27,3 +27,14 @@ jobs:
       - name: image de migration
         if: matrix.template == 'nuxt-postgres'
         run: docker build --target migrate templates/nuxt-postgres
+
+  # Le modèle "programme" n'a pas de Dockerfile : on vérifie juste que son compose est valide.
+  program:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose config
+        run: |
+          cd templates/program
+          sed -i 's/__PROJECT_ID__/ci-test/g; s/__PROJECT_NAME__/CI/g' docker-compose.yml
+          docker compose config --quiet
