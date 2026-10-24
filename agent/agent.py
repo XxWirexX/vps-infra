@@ -12,6 +12,8 @@ Actions :
   GET  /templates       modèles de projet disponibles
   POST /projects        crée un projet à partir d'un modèle (tâche en arrière-plan) -> { job }
   POST /imports         importe un repo GitHub existant (tâche en arrière-plan) -> { job }
+  GET  /projects        projets présents dans ~/projects et état de leurs conteneurs
+  POST /projects/<id>/delete   supprime un projet du serveur (tâche) -> { job }
   GET  /jobs/<id>       avancement d'une tâche (journal, résultat)
 
 Aucune dépendance : bibliothèque standard de Python uniquement.
@@ -167,7 +169,7 @@ class Job:
 
 
 JOBS: dict[str, Job] = {}
-CREATE_LOCK = threading.Lock()  # une seule création de projet à la fois
+CREATE_LOCK = threading.Lock()  # une seule opération (création, import, suppression) à la fois
 
 
 def run(job: Job, cmd: list[str], *, cwd: Path | None = None, stdin: str | None = None,
@@ -625,7 +627,7 @@ def parse_port(value) -> int | None:
 
 def launch(target, job_id_project: str, *args) -> Job:
     if not CREATE_LOCK.acquire(blocking=False):
-        raise AgentError("Une création de projet est déjà en cours, réessaie dans un instant.")
+        raise AgentError("Une autre opération (création, import ou suppression) est en cours, réessaie dans un instant.")
     job = Job(job_id_project)
     JOBS[job.id] = job
     threading.Thread(target=target, args=(job, *args), daemon=True).start()
@@ -654,6 +656,174 @@ def start_import(body: dict) -> Job:
     return launch(import_project, project_id, source, project_id, name, subdomain, port)
 
 
+# ── Liste et suppression des projets ───────────────────────────────────────────
+
+GITHUB_REMOTE_RE = re.compile(r"github\.com[:/]([A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}?)(?:\.git)?/?$")
+
+
+def project_dir_for(project_id: str) -> Path:
+    """Dossier d'un projet, en refusant tout ce qui sortirait de ~/projects (lien symbolique compris)."""
+    if not ID_RE.match(project_id):
+        raise AgentError("Identifiant invalide.")
+    root = PROJECTS_DIR.resolve()
+    path = (PROJECTS_DIR / project_id)
+    if path.is_symlink() or not path.is_dir() or path.resolve().parent != root:
+        raise AgentError(f"Projet introuvable : {project_id}")
+    return path
+
+
+def github_repo_of(project_dir: Path) -> str | None:
+    """owner/repo du remote origin, s'il pointe vers GitHub."""
+    out = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=project_dir,
+                         capture_output=True, text=True).stdout.strip()
+    match = GITHUB_REMOTE_RE.search(out)
+    return match.group(1) if match else None
+
+
+def has_compose(project_dir: Path) -> bool:
+    return any((project_dir / n).is_file() for n in COMPOSE_NAMES)
+
+
+def compose_containers(project_dir: Path) -> list[dict]:
+    """Conteneurs du projet et leur état, d'après docker compose."""
+    if DRY_RUN or not has_compose(project_dir):
+        return []
+    try:
+        out = subprocess.run(["docker", "compose", "ps", "-a", "--format", "json"], cwd=project_dir,
+                             capture_output=True, text=True, timeout=15).stdout.strip()
+    except subprocess.TimeoutExpired:
+        return []
+    if not out:
+        return []
+    # Selon la version de Docker Compose : un tableau JSON, ou un objet par ligne
+    try:
+        rows = json.loads(out)
+        rows = rows if isinstance(rows, list) else [rows]
+    except json.JSONDecodeError:
+        rows = [json.loads(line) for line in out.splitlines() if line.strip().startswith("{")]
+    return [{"name": r.get("Name", ""), "service": r.get("Service", ""), "state": r.get("State", ""),
+             "status": r.get("Status", "")} for r in rows]
+
+
+def list_projects() -> list[dict]:
+    projects = []
+    if not PROJECTS_DIR.is_dir():
+        return projects
+    for path in sorted(PROJECTS_DIR.iterdir()):
+        if path.is_symlink() or not path.is_dir() or not ID_RE.match(path.name):
+            continue
+        branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=path,
+                                capture_output=True, text=True).stdout.strip() if (path / ".git").exists() else ""
+        projects.append({
+            "id": path.name,
+            "repo": github_repo_of(path) if (path / ".git").exists() else None,
+            "branch": branch or None,
+            "compose": has_compose(path),
+            "containers": compose_containers(path),
+        })
+    return projects
+
+
+def remove_authorized_lines(job: Job, project_id: str) -> int:
+    """Retire de authorized_keys la clé de GitHub Actions de ce projet (et seulement elle)."""
+    authorized = SSH_DIR / "authorized_keys"
+    if not authorized.is_file():
+        return 0
+    marker = f'command="{DEPLOY_SCRIPT} {project_id}",'
+    comment = f"github-actions-{project_id}"
+    lines = authorized.read_text("utf-8").splitlines(keepends=True)
+    kept = [l for l in lines if not (l.startswith(marker) or l.rstrip().endswith(" " + comment))]
+    removed = len(lines) - len(kept)
+    if removed:
+        tmp = authorized.with_name(".authorized_keys.tmp")
+        tmp.write_text("".join(kept), "utf-8")
+        tmp.chmod(0o600)
+        tmp.replace(authorized)
+    return removed
+
+
+def delete_project(job: Job, project_id: str, volumes: bool) -> None:
+    warnings: list[str] = []
+    try:
+        project_dir = project_dir_for(project_id)
+        repo = github_repo_of(project_dir) if (project_dir / ".git").exists() else None
+        job.write(f"▶ Suppression de {project_id}" + (f" ({repo})" if repo else ""))
+        if DRY_RUN:
+            job.write("  Mode dry-run : GitHub et Docker ne seront pas touchés.")
+
+        # 1. Conteneurs, réseaux, images construites (et volumes si demandé)
+        if has_compose(project_dir):
+            job.write("▶ Arrêt et suppression des conteneurs" + (" et des données (volumes)" if volumes else ""))
+            cmd = ["docker", "compose", "down", "--remove-orphans", "--rmi", "local"]
+            if volumes:
+                cmd.append("--volumes")
+            run(job, cmd, cwd=project_dir, external=True)
+            if not volumes:
+                job.write("  Les volumes (données) sont conservés : docker volume ls pour les retrouver.")
+        else:
+            job.write("  Pas de fichier compose : aucun conteneur à arrêter.")
+
+        # 2. GitHub : clé de lecture du serveur et secrets de déploiement (le repo lui-même est gardé)
+        if repo:
+            job.write("▶ Nettoyage côté GitHub (le repo est conservé)")
+            if not DRY_RUN and not GH_TOKEN:
+                warnings.append("GH_TOKEN absent : clé de déploiement et secrets non retirés de GitHub.")
+            else:
+                try:
+                    keys = run(job, ["gh", "repo", "deploy-key", "list", "-R", repo, "--json", "id,title"],
+                               extra_env=gh_env(), external=True)
+                    for key in json.loads(keys or "[]"):
+                        if key.get("title") == "VPS (lecture seule)":
+                            run(job, ["gh", "repo", "deploy-key", "delete", str(key["id"]), "-R", repo],
+                                extra_env=gh_env(), external=True)
+                except (AgentError, json.JSONDecodeError) as err:
+                    warnings.append(f"Clé de déploiement non retirée de GitHub : {err}")
+                for name in ("VPS_SSH_KEY", "VPS_HOST", "VPS_USER"):
+                    try:
+                        run(job, ["gh", "secret", "delete", name, "-R", repo], extra_env=gh_env(), external=True)
+                    except AgentError:
+                        pass  # secret absent (projet installé à la main, par exemple)
+
+        # 3. Clés SSH du serveur
+        job.write("▶ Clés SSH")
+        removed = remove_authorized_lines(job, project_id)
+        job.write(f"  authorized_keys : {removed} ligne(s) retirée(s)")
+        for f in (SSH_DIR / "deploy" / project_id, SSH_DIR / "deploy" / f"{project_id}.pub",
+                  SSH_DIR / "deploy" / f"{project_id}-actions.pub"):
+            if f.exists():
+                f.unlink()
+                job.write(f"  - {f}")
+
+        # 4. Dossier du projet
+        job.write(f"▶ Suppression de {project_dir}")
+        failed: list[str] = []
+        shutil.rmtree(project_dir, onerror=lambda _fn, path, _exc: failed.append(path))
+        if failed:
+            warnings.append(f"{len(failed)} fichier(s) n'ont pas pu être supprimés (créés par un conteneur en root) : "
+                            f"sudo rm -rf {project_dir}")
+
+        for w in warnings:
+            job.write(f"⚠ {w}")
+        job.result = {
+            "repo": f"https://github.com/{repo}" if repo else None,
+            "warnings": warnings,
+        }
+        job.write(f"✔ {project_id} est supprimé du serveur"
+                  + (". Le repo GitHub est conservé : supprime-le à la main si tu n'en veux plus." if repo else "."))
+        job.status = "done"
+    except Exception as err:  # noqa: BLE001
+        fail(job, err, [])
+    finally:
+        CREATE_LOCK.release()
+
+
+def start_delete(project_id: str, body: dict) -> Job:
+    project_dir_for(project_id)  # vérifie avant de lancer la tâche
+    if body.get("confirm") != project_id:
+        raise AgentError("Confirmation invalide : retape l'identifiant du projet.")
+    return launch(delete_project, project_id, project_id, body.get("volumes") is True)
+
+
 # ── Serveur HTTP sur socket Unix ──────────────────────────────────────────────
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -678,6 +848,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "dryRun": DRY_RUN})
         if self.path == "/templates":
             return self.send_json(200, list_templates())
+        if self.path == "/projects":
+            return self.send_json(200, list_projects())
         match = re.fullmatch(r"/jobs/([a-f0-9]{12})", self.path)
         if match and match.group(1) in JOBS:
             return self.send_json(200, JOBS[match.group(1)].snapshot())
@@ -685,6 +857,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         actions = {"/projects": start_create, "/imports": start_import}
+        delete = re.fullmatch(r"/projects/([a-z0-9-]{1,32})/delete", self.path)
+        if delete:
+            actions[self.path] = lambda body: start_delete(delete.group(1), body)
         if self.path not in actions:
             return self.send_json(404, {"error": "Introuvable."})
         try:

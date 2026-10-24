@@ -102,12 +102,17 @@ cd ~/infra/admin && docker compose up -d --build
 journalctl -u agent -f
 ```
 
-## Supprimer un projet (à la main pour l'instant)
+## Supprimer un projet
 
-```bash
-cd ~/projects/<id> && docker compose down -v      # -v supprime aussi la base, attention
-rm -rf ~/projects/<id> ~/.ssh/deploy/<id>*
-nano ~/.ssh/authorized_keys                        # retirer la ligne github-actions-<id>
-```
+Panel → section **Projets sur le serveur** → **Supprimer** (il faut retaper l'identifiant pour confirmer).
+L'agent :
 
-Puis supprime le site dans le panel, et le repo sur GitHub si tu ne le gardes pas.
+1. arrête et supprime les conteneurs et les images construites (`docker compose down --rmi local`),
+   et les volumes **seulement si** la case « Supprimer aussi les données » est cochée ;
+2. retire côté GitHub la clé de déploiement « VPS (lecture seule) » et les secrets `VPS_*`
+   (**le repo est conservé**, à supprimer à la main sur GitHub si besoin) ;
+3. retire la ligne `github-actions-<id>` de `authorized_keys` et les clés de `~/.ssh/deploy/` ;
+4. supprime `~/projects/<id>`.
+
+Le panel retire tout de suite les routes qui pointaient vers le projet. Si des fichiers créés par
+un conteneur en root restent, le journal donne la commande `sudo rm -rf` à lancer.

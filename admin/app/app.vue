@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Site, SiteHealth } from '#shared/types/site'
+import type { ServerProject, Site, SiteHealth } from '#shared/types/site'
 
 type SiteRow = Site & { host: string }
 
@@ -99,6 +99,42 @@ async function onSaved() {
   notify(wasEdit ? 'Site mis à jour.' : 'Site ajouté.')
 }
 
+// ── Projets présents sur le serveur (via l'agent) ──
+const projects = ref<ServerProject[]>([])
+const projectsError = ref('')
+const projectsLoading = ref(true)
+async function refreshProjects() {
+  try {
+    projects.value = await $fetch<ServerProject[]>('/api/projects')
+    projectsError.value = ''
+  } catch (err) {
+    projectsError.value = await apiErrorMessage(err, "Impossible de joindre l'agent.")
+  } finally {
+    projectsLoading.value = false
+  }
+}
+onMounted(refreshProjects)
+
+/** Sous-domaines qui pointent vers un projet (même id, ou un de ses conteneurs) */
+function hostsOf(project: ServerProject) {
+  const names = new Set([project.id, ...project.containers.map((c) => c.name)])
+  return sites.value.filter((s) => s.id === project.id || names.has(s.container)).map((s) => s.host)
+}
+function stateClass(state: string) {
+  if (state === 'running') return 'up'
+  if (state === 'restarting' || state === 'exited' || state === 'dead') return 'down'
+  return 'other'
+}
+
+const deleting = ref<ServerProject | null>(null)
+async function onProjectDeleted() {
+  await Promise.all([refreshSites(), refreshProjects()])
+}
+async function onDeleteClosed() {
+  deleting.value = null
+  await Promise.all([refreshSites(), refreshProjects()])
+}
+
 // ── Nouveau projet ──
 const projectOpen = ref(false)
 async function onProjectCreated() {
@@ -107,6 +143,7 @@ async function onProjectCreated() {
 }
 async function onProjectClosed() {
   projectOpen.value = false
+  refreshProjects()
   await refreshSites()
   refreshHealth()
 }
@@ -192,13 +229,44 @@ function healthOf(site: SiteRow) {
 
           <div class="actions">
             <button class="btn btn-ghost" :disabled="busy === site.id" @click="openForm(site)">Modifier</button>
-            <button class="btn btn-ghost btn-danger" :disabled="busy === site.id" @click="removeSite(site)">Supprimer</button>
+            <button class="btn btn-ghost btn-danger" :disabled="busy === site.id" title="Retire seulement le sous-domaine, le conteneur continue de tourner" @click="removeSite(site)">Retirer</button>
           </div>
         </li>
       </ul>
     </section>
 
+    <!-- Projets -->
+    <section>
+      <div class="section-head">
+        <h2>Projets sur le serveur <span class="count">{{ projects.length }}</span></h2>
+        <button class="btn btn-ghost" :disabled="projectsLoading" @click="refreshProjects">Actualiser</button>
+      </div>
+
+      <p v-if="projectsError" class="empty">{{ projectsError }}</p>
+      <p v-else-if="projectsLoading" class="empty">Chargement…</p>
+      <p v-else-if="!projects.length" class="empty">Aucun projet dans <code>~/projects</code>.</p>
+
+      <ul v-else class="projects">
+        <li v-for="p in projects" :key="p.id" class="project">
+          <div class="info">
+            <div class="name">{{ p.id }}</div>
+            <a v-if="p.repo" :href="`https://github.com/${p.repo}`" target="_blank" rel="noopener" class="repo mono">{{ p.repo }}</a>
+            <span v-else class="repo mono muted">pas de repo GitHub</span>
+            <div v-if="hostsOf(p).length" class="target mono">→ {{ hostsOf(p).join(', ') }}</div>
+          </div>
+          <div class="containers">
+            <span v-for="c in p.containers" :key="c.name" class="chip" :class="stateClass(c.state)" :title="c.status">
+              <span class="chip-dot" />{{ c.service || c.name }}
+            </span>
+            <span v-if="!p.containers.length" class="chip other">{{ p.compose ? 'aucun conteneur' : 'pas de compose' }}</span>
+          </div>
+          <button class="btn btn-ghost btn-danger" @click="deleting = p">Supprimer</button>
+        </li>
+      </ul>
+    </section>
+
     <SiteForm v-if="formOpen" :site="editing" @saved="onSaved" @close="formOpen = false" />
+    <DeleteProjectDialog v-if="deleting" :project="deleting" :hosts="hostsOf(deleting)" @deleted="onProjectDeleted" @close="onDeleteClosed" />
     <ProjectForm v-if="projectOpen" @created="onProjectCreated" @close="onProjectClosed" />
 
     <div v-if="sessionExpired" class="session" role="alert">
@@ -295,6 +363,29 @@ h2 { font-size: 1rem; color: var(--text-strong); font-weight: 600; }
   padding: 0.75rem 1rem; border-radius: 10px;
   background: #2b2111; border: 1px solid rgba(245, 176, 65, 0.5); color: var(--warn);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font-size: 0.9rem;
+}
+.projects { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.project {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 1rem;
+  padding: 0.85rem 1.1rem; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.repo { color: var(--accent); text-decoration: none; font-size: 0.85em; display: block; }
+.repo:hover { text-decoration: underline; }
+.muted { color: var(--muted); }
+.containers { display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-end; }
+.chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem;
+  background: #202020; border: 1px solid var(--border); color: var(--text);
+}
+.chip-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--muted); }
+.chip.up .chip-dot { background: var(--ok); }
+.chip.down { border-color: #5c2020; }
+.chip.down .chip-dot { background: var(--danger); }
+.chip.other { color: var(--muted); }
+@media (max-width: 640px) {
+  .project { grid-template-columns: 1fr; }
+  .containers { justify-content: flex-start; }
 }
 .toast {
   position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);

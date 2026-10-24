@@ -79,3 +79,13 @@ export interface ProjectJob {
   routeCreated?: boolean
   routeError?: string
 }
+
+/** Projet présent sur le serveur (~/projects/<id>), d'après l'agent */
+export interface ServerProject {
+  id: string
+  /** owner/repo sur GitHub, si le remote pointe vers GitHub */
+  repo: string | null
+  branch: string | null
+  compose: boolean
+  containers: { name: string; service: string; state: string; status: string }[]
+}
