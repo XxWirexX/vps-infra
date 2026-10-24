@@ -17,8 +17,17 @@ if [[ ! "$ID" =~ ^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$ ]]; then
 fi
 
 DIR="/home/debian/projects/$ID"
-if [[ ! -f "$DIR/docker-compose.yml" ]]; then
-  echo "Projet introuvable : $DIR" >&2
+if [[ ! -d "$DIR/.git" ]]; then
+  echo "Projet introuvable : $DIR (pas de dépôt Git)" >&2
+  exit 2
+fi
+# Tous les noms de fichier que Docker Compose reconnaît
+found=""
+for f in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+  [[ -f "$DIR/$f" ]] && found="$f"
+done
+if [[ -z "$found" ]]; then
+  echo "Aucun fichier compose dans $DIR (docker-compose.yml, compose.yaml…)" >&2
   exit 2
 fi
 
