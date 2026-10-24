@@ -28,6 +28,7 @@ const form = reactive({
   // Port du modèle « Autre stack », et port de l'import (vide = auto)
   port: '' as string | number,
   importPort: '' as string | number,
+  protected: false,
 })
 const idTouched = ref(false)
 const subTouched = ref(false)
@@ -91,11 +92,11 @@ async function submit() {
     const res = mode.value === 'import'
       ? await $fetch<{ job: string }>('/api/imports', {
           method: 'POST',
-          body: { repo: form.repo, id: form.id, name: form.name, web: form.web, subdomain: form.subdomain, port },
+          body: { repo: form.repo, id: form.id, name: form.name, web: form.web, subdomain: form.subdomain, port, protected: form.protected },
         })
       : await $fetch<{ job: string }>('/api/projects', {
           method: 'POST',
-          body: { id: form.id, name: form.name, template: form.template, subdomain: form.subdomain, port },
+          body: { id: form.id, name: form.name, template: form.template, subdomain: form.subdomain, port, protected: form.protected },
         })
     emit('created')
     job.value = { id: res.job, project: form.id, status: 'running', log: [], result: null, error: null }
@@ -199,6 +200,7 @@ function close() {
             <input v-else v-model="form.port" type="number" min="1" max="65535" required>
           </label>
         </div>
+        <ProtectedToggle v-if="isWeb" v-model="form.protected" />
         <p v-else-if="mode === 'template'" class="hint">
           Pas de sous-domaine : le programme n'est pas exposé sur le web. Il démarre avec un
           <code>docker-compose.yml</code> de démo, à remplacer par le tien (le README du repo explique comment).

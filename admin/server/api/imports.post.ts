@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   const { job } = await callAgent<{ job: string }>('POST', '/imports', {
     repo, id, name, web, subdomain, port,
   })
-  if (web) addPendingRoute(job, { id, name, subdomain })
+  if (web) addPendingRoute(job, { id, name, subdomain, protected: body.protected === true })
   setResponseStatus(event, 202)
   return { job }
 })

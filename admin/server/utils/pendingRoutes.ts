@@ -10,6 +10,7 @@ interface Pending {
   id: string
   name: string
   subdomain: string
+  protected?: boolean
   error?: string
   created?: boolean
 }
@@ -31,7 +32,7 @@ export async function settleRoute(job: ProjectJob): Promise<ProjectJob> {
       await updateSites((sites) => {
         if (sites.some((s) => s.id === p.id)) return
         const input = parseSiteInput(
-          { id: p.id, name: p.name, subdomain: p.subdomain, container: route.container, port: route.port },
+          { id: p.id, name: p.name, subdomain: p.subdomain, container: route.container, port: route.port, protected: p.protected },
           sites,
         )
         const now = new Date().toISOString()
@@ -44,6 +45,7 @@ export async function settleRoute(job: ProjectJob): Promise<ProjectJob> {
           maintenance: false,
           visibility: input.visibility,
           description: input.description,
+          protected: input.protected,
           createdAt: now,
           updatedAt: now,
         }

@@ -6,6 +6,7 @@
 - **Maintenance par site** : envoie le site vers la page 503, instantanément.
 - **Filet de sécurité** : bascule les domaines sans site entre 404 et maintenance.
 - **État** : vérifie toutes les 30 s que chaque conteneur répond.
+- **Protection** : un site peut être « Protégé par le portier » (connexion obligatoire, via le middleware `portier@docker`). La visibilité « Privé » cache seulement le site du hub, elle ne le protège pas.
 - **Hub** : chaque site a une visibilité (public, privé, masqué) et une description, affichées sur `hub.wireredblue.xyz` (voir `hub/README.md`).
 - **Nouveau projet** : repo GitHub, clés, CD et premier déploiement en un clic, via l'agent du serveur (voir `agent/README.md`).
 

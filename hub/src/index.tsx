@@ -54,7 +54,14 @@ const Section: FC<{ title: string; sites: HubSite[]; health: Map<string, boolean
       </h2>
       <div class="grid">
         {p.sites.map((s) => (
-          <Card name={s.name} host={s.host} description={s.description} up={p.health.get(s.id)} maintenance={s.maintenance} />
+          <Card
+            name={s.name}
+            host={s.host}
+            description={s.description}
+            up={p.health.get(s.id)}
+            maintenance={s.maintenance}
+            tag={s.protected ? '🔒 connexion requise' : undefined}
+          />
         ))}
       </div>
     </section>

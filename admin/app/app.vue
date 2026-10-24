@@ -171,6 +171,7 @@ function healthOf(site: SiteRow) {
               <span v-if="site.maintenance" class="badge">maintenance</span>
               <span v-if="(site.visibility ?? 'private') === 'public'" class="badge vis-public" title="Visible par tout le monde sur le hub">public</span>
               <span v-else-if="site.visibility === 'hidden'" class="badge vis-hidden" title="N'apparaît pas sur le hub">masqué</span>
+              <span v-if="site.protected" class="badge vis-protected" title="Connexion au portier obligatoire">🔒 protégé</span>
             </div>
             <a :href="`https://${site.host}`" target="_blank" rel="noopener" class="host mono">{{ site.host }}</a>
             <div class="target mono">→ {{ site.container }}:{{ site.port }}</div>
@@ -266,6 +267,7 @@ h2 { font-size: 1rem; color: var(--text-strong); font-weight: 600; }
 }
 .badge.vis-public { background: rgba(74, 222, 128, 0.12); color: var(--ok); }
 .badge.vis-hidden { background: #222; color: var(--muted); }
+.badge.vis-protected { background: rgba(79, 142, 247, 0.14); color: var(--accent); }
 .host { color: var(--accent); text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; }
 .host:hover { text-decoration: underline; }
 .target { color: var(--muted); }

@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     // Le conteneur porte le nom du projet, le port vient du modèle (ou du formulaire pour « Autre stack »).
     const port = template.customPort ? body.port : template.port
     const input = parseSiteInput(
-      { id: body.id, name: body.name, subdomain: body.subdomain, container: body.id, port },
+      { id: body.id, name: body.name, subdomain: body.subdomain, container: body.id, port, protected: body.protected },
       sites,
     )
 
@@ -47,6 +47,7 @@ export default defineEventHandler(async (event) => {
       maintenance: false,
       visibility: input.visibility,
       description: input.description,
+      protected: input.protected,
       createdAt: now,
       updatedAt: now,
     }

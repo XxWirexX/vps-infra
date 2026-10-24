@@ -12,6 +12,8 @@ export interface HubSite {
   port: number
   maintenance: boolean
   visibility: Visibility
+  /** Connexion au portier obligatoire pour y accéder */
+  protected: boolean
 }
 
 /**
@@ -37,6 +39,7 @@ export async function loadSites(): Promise<HubSite[]> {
       container: String(s.container ?? ''),
       port: Number(s.port) || 80,
       maintenance: !!s.maintenance,
+      protected: !!s.protected,
       visibility: (['public', 'private', 'hidden'] as const).includes(s.visibility) ? s.visibility : 'private',
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'))

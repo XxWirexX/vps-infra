@@ -24,6 +24,8 @@ export interface Site {
   visibility?: Visibility
   /** Courte description affichée dans le hub */
   description?: string
+  /** true = il faut être connecté au portier pour accéder au site */
+  protected?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -33,6 +35,7 @@ export type SiteInput = Pick<Site, 'name' | 'subdomain' | 'container' | 'port'> 
   id?: string
   visibility: Visibility
   description: string
+  protected: boolean
 }
 
 export interface SiteHealth {

@@ -73,7 +73,10 @@ export function parseSiteInput(body: unknown, sites: Site[], currentId?: string)
   const description = typeof b.description === 'string' ? b.description.trim().replace(/\s+/g, ' ') : ''
   if (description.length > 160) fail('La description fait 160 caractères au maximum.')
 
-  const input: SiteInput = { name, subdomain, container, port, visibility, description }
+  // Protégé : Traefik demande au portier avant de laisser passer (comme admin.wireredblue.xyz)
+  const isProtected = b.protected === true
+
+  const input: SiteInput = { name, subdomain, container, port, visibility, description, protected: isProtected }
 
   // L'id n'est choisi qu'à la création, il ne change plus ensuite.
   if (!currentId) {
@@ -129,6 +132,8 @@ export function renderSite(site: Site): string {
           // En maintenance, on envoie vers le service 503 défini dans 00-maintenance.yml
           service: site.maintenance ? 'maintenance-503' : name,
           priority: ROUTER_PRIORITY,
+          // Site protégé : connexion au portier obligatoire (sauf la page de maintenance)
+          ...(site.protected && !site.maintenance ? { middlewares: ['portier@docker'] } : {}),
         },
       },
       services: {

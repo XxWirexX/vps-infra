@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
       maintenance: false,
       visibility: input.visibility,
       description: input.description,
+      protected: input.protected,
       createdAt: now,
       updatedAt: now,
     }

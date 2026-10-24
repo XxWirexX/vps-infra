@@ -15,6 +15,7 @@ const form = reactive({
   port: props.site?.port ?? 3000,
   visibility: (props.site?.visibility ?? 'private') as Visibility,
   description: props.site?.description ?? '',
+  protected: props.site?.protected ?? false,
 })
 
 // À la création, l'identifiant suit le nom tant qu'on ne l'a pas modifié soi-même.
@@ -98,6 +99,8 @@ onMounted(() => dialog.value?.showModal())
       </label>
 
       <VisibilityPicker v-model="form.visibility" />
+
+      <ProtectedToggle v-model="form.protected" />
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
 
