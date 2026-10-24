@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Site } from '#shared/types/site'
+import type { Site, Visibility } from '#shared/types/site'
 
 const props = defineProps<{ site?: Site | null }>()
 const emit = defineEmits<{ saved: []; close: [] }>()
@@ -13,6 +13,8 @@ const form = reactive({
   subdomain: props.site?.subdomain ?? '',
   container: props.site?.container ?? '',
   port: props.site?.port ?? 3000,
+  visibility: (props.site?.visibility ?? 'private') as Visibility,
+  description: props.site?.description ?? '',
 })
 
 // À la création, l'identifiant suit le nom tant qu'on ne l'a pas modifié soi-même.
@@ -89,6 +91,13 @@ onMounted(() => dialog.value?.showModal())
         </label>
       </div>
       <p class="hint">Le conteneur doit être branché sur le réseau Docker <code>proxy</code>.</p>
+
+      <label>
+        <span>Description <small>— affichée sur le hub, facultative</small></span>
+        <input v-model="form.description" type="text" maxlength="160" placeholder="Un Wordle communautaire">
+      </label>
+
+      <VisibilityPicker v-model="form.visibility" />
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
 

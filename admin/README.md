@@ -6,6 +6,7 @@
 - **Maintenance par site** : envoie le site vers la page 503, instantanément.
 - **Filet de sécurité** : bascule les domaines sans site entre 404 et maintenance.
 - **État** : vérifie toutes les 30 s que chaque conteneur répond.
+- **Hub** : chaque site a une visibilité (public, privé, masqué) et une description, affichées sur `hub.wireredblue.xyz` (voir `hub/README.md`).
 - **Nouveau projet** : repo GitHub, clés, CD et premier déploiement en un clic, via l'agent du serveur (voir `agent/README.md`).
 
 ## Fonctionnement
@@ -27,7 +28,7 @@ et supprime ceux qui ne correspondent plus à aucun site. Les autres fichiers de
 Les routes du panel ont une priorité de 100, plus haute que celles des labels Docker :
 un site peut donc être repris par le panel avant d'avoir retiré ses labels.
 
-Les sous-domaines `admin`, `auth` et `www` sont réservés (gérés en labels).
+Les sous-domaines `admin`, `auth`, `hub` et `www` sont réservés (gérés en labels).
 
 ## Sécurité
 

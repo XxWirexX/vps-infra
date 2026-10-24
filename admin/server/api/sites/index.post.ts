@@ -12,6 +12,8 @@ export default defineEventHandler(async (event) => {
       container: input.container,
       port: input.port,
       maintenance: false,
+      visibility: input.visibility,
+      description: input.description,
       createdAt: now,
       updatedAt: now,
     }

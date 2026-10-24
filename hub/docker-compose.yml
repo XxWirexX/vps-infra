@@ -1,0 +1,25 @@
+services:
+  hub:
+    build: .
+    container_name: hub
+    restart: unless-stopped
+    environment:
+      DOMAIN: wireredblue.xyz
+      SITES_FILE: /data/sites.json
+      PORTIER_VERIFY_URL: http://portier:3000/verify
+    volumes:
+      # La liste des sites vient du panel admin, en lecture seule
+      - ../admin/data:/data:ro
+    networks:
+      - proxy
+    labels:
+      # Public : pas de middleware portier. Les sites privés ne sont affichés
+      # qu'après vérification de la session auprès du portier.
+      - traefik.enable=true
+      - traefik.http.routers.hub.rule=Host(`hub.wireredblue.xyz`)
+      - traefik.http.routers.hub.entrypoints=websecure
+      - traefik.http.services.hub.loadbalancer.server.port=3000
+
+networks:
+  proxy:
+    external: true

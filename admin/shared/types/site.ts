@@ -1,3 +1,11 @@
+/**
+ * Visibilité dans le hub (hub.wireredblue.xyz) :
+ * - public : visible par tout le monde
+ * - private : visible seulement une fois connecté au portier
+ * - hidden : jamais affiché
+ */
+export type Visibility = 'public' | 'private' | 'hidden'
+
 /** Un site géré par le panel : un sous-domaine qui pointe vers un conteneur. */
 export interface Site {
   /** Identifiant stable, sert aussi de nom de fichier (site-<id>.yml) */
@@ -12,12 +20,20 @@ export interface Site {
   port: number
   /** true = le site renvoie la page de maintenance (503) */
   maintenance: boolean
+  /** Visibilité dans le hub (absent sur les anciens sites = private) */
+  visibility?: Visibility
+  /** Courte description affichée dans le hub */
+  description?: string
   createdAt: string
   updatedAt: string
 }
 
 /** Champs modifiables depuis le formulaire */
-export type SiteInput = Pick<Site, 'name' | 'subdomain' | 'container' | 'port'> & { id?: string }
+export type SiteInput = Pick<Site, 'name' | 'subdomain' | 'container' | 'port'> & {
+  id?: string
+  visibility: Visibility
+  description: string
+}
 
 export interface SiteHealth {
   up: boolean

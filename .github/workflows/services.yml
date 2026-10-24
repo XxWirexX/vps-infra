@@ -1,0 +1,20 @@
+name: Services
+
+# Construit les images du panel admin et du hub à chaque modification,
+# pour repérer une erreur avant le déploiement sur le serveur.
+on:
+  push:
+    paths: ["admin/**", "hub/**", ".github/workflows/services.yml"]
+  pull_request:
+    paths: ["admin/**", "hub/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [admin, hub]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build ${{ matrix.service }}

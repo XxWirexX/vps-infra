@@ -42,6 +42,8 @@ export async function settleRoute(job: ProjectJob): Promise<ProjectJob> {
           container: input.container,
           port: input.port,
           maintenance: false,
+          visibility: input.visibility,
+          description: input.description,
           createdAt: now,
           updatedAt: now,
         }

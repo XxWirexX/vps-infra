@@ -120,6 +120,7 @@ function healthOf(site: SiteRow) {
         <h1>Admin</h1>
         <p class="sub mono">{{ domain }}</p>
       </div>
+      <a class="btn btn-ghost" :href="`https://hub.${domain}`" target="_blank" rel="noopener">Voir le hub ↗</a>
     </header>
 
     <!-- Filet de sécurité -->
@@ -168,6 +169,8 @@ function healthOf(site: SiteRow) {
             <div class="name">
               {{ site.name }}
               <span v-if="site.maintenance" class="badge">maintenance</span>
+              <span v-if="(site.visibility ?? 'private') === 'public'" class="badge vis-public" title="Visible par tout le monde sur le hub">public</span>
+              <span v-else-if="site.visibility === 'hidden'" class="badge vis-hidden" title="N'apparaît pas sur le hub">masqué</span>
             </div>
             <a :href="`https://${site.host}`" target="_blank" rel="noopener" class="host mono">{{ site.host }}</a>
             <div class="target mono">→ {{ site.container }}:{{ site.port }}</div>
@@ -207,6 +210,7 @@ function healthOf(site: SiteRow) {
   padding: 2.5rem 1rem 4rem;
   display: flex; flex-direction: column; gap: 1.75rem;
 }
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 h1 { font-size: 1.6rem; color: var(--text-strong); letter-spacing: -0.02em; }
 h2 { font-size: 1rem; color: var(--text-strong); font-weight: 600; }
 .sub { color: var(--muted); }
@@ -260,6 +264,8 @@ h2 { font-size: 1rem; color: var(--text-strong); font-weight: 600; }
   padding: 0.05rem 0.45rem; border-radius: 4px;
   background: rgba(245, 176, 65, 0.15); color: var(--warn);
 }
+.badge.vis-public { background: rgba(74, 222, 128, 0.12); color: var(--ok); }
+.badge.vis-hidden { background: #222; color: var(--muted); }
 .host { color: var(--accent); text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; }
 .host:hover { text-decoration: underline; }
 .target { color: var(--muted); }

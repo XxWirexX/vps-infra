@@ -15,7 +15,7 @@ function cfg() {
 }
 
 /** Sous-domaines que le panel ne doit jamais attribuer (gérés ailleurs, en labels). */
-const RESERVED_SUBDOMAINS = new Set(['admin', 'auth', 'www'])
+const RESERVED_SUBDOMAINS = new Set(['admin', 'auth', 'hub', 'www'])
 
 /** Préfixe des fichiers Traefik générés par le panel. */
 const FILE_PREFIX = 'site-'
@@ -68,7 +68,12 @@ export function parseSiteInput(body: unknown, sites: Site[], currentId?: string)
   const port = Number(b.port)
   if (!Number.isInteger(port) || port < 1 || port > 65535) fail('Le port doit être un entier entre 1 et 65535.')
 
-  const input: SiteInput = { name, subdomain, container, port }
+  // Visibilité dans le hub : privé par défaut, pour ne jamais exposer un site par erreur
+  const visibility = (['public', 'private', 'hidden'] as const).find((v) => v === b.visibility) ?? 'private'
+  const description = typeof b.description === 'string' ? b.description.trim().replace(/\s+/g, ' ') : ''
+  if (description.length > 160) fail('La description fait 160 caractères au maximum.')
+
+  const input: SiteInput = { name, subdomain, container, port, visibility, description }
 
   // L'id n'est choisi qu'à la création, il ne change plus ensuite.
   if (!currentId) {
