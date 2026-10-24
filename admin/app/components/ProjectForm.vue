@@ -16,7 +16,7 @@ onMounted(async () => {
     dryRun.value = res.dryRun
     form.template ||= res.templates[0]?.id ?? ''
   } catch (err: any) {
-    loadError.value = err?.data?.message || "Impossible de joindre l'agent."
+    loadError.value = await apiErrorMessage(err, "Impossible de joindre l'agent.")
   }
 })
 
@@ -103,7 +103,7 @@ async function submit() {
     poll = setInterval(() => refreshJob(res.job), 1000)
     refreshJob(res.job)
   } catch (err: any) {
-    error.value = err?.data?.message || err?.message || 'Erreur inattendue.'
+    error.value = await apiErrorMessage(err)
   } finally {
     submitting.value = false
   }

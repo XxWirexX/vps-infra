@@ -47,7 +47,7 @@ async function submit() {
     }
     emit('saved')
   } catch (err: any) {
-    error.value = err?.data?.message || err?.message || 'Erreur inattendue.'
+    error.value = await apiErrorMessage(err)
   } finally {
     saving.value = false
   }

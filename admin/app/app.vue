@@ -10,13 +10,16 @@ const { data: global, refresh: refreshGlobal } = await useFetch<{ maintenance: b
   default: () => ({ maintenance: false }),
 })
 
+const sessionExpired = useSessionExpired()
+
 // ── État des conteneurs (rafraîchi toutes les 30 s, côté navigateur uniquement) ──
 const health = ref<Record<string, SiteHealth>>({})
 async function refreshHealth() {
   try {
     health.value = await $fetch<Record<string, SiteHealth>>('/api/sites/health')
   } catch {
-    /* on garde le dernier état connu */
+    // On garde le dernier état connu, mais on signale tout de suite une session expirée
+    if (await sessionLost()) sessionExpired.value = true
   }
 }
 let timer: ReturnType<typeof setInterval> | undefined
@@ -34,8 +37,8 @@ function notify(message: string, error = false) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = null), 3500)
 }
-function errorMessage(err: any) {
-  return err?.data?.message || err?.message || 'Erreur inattendue.'
+function reload() {
+  window.location.reload()
 }
 
 // ── Actions ──
@@ -48,7 +51,7 @@ async function toggleSiteMaintenance(site: SiteRow, enabled: boolean) {
     await refreshSites()
     notify(enabled ? `${site.host} est en maintenance.` : `${site.host} est de nouveau en ligne.`)
   } catch (err) {
-    notify(errorMessage(err), true)
+    notify(await apiErrorMessage(err), true)
   } finally {
     busy.value = null
   }
@@ -61,7 +64,7 @@ async function toggleGlobal(enabled: boolean) {
     await refreshGlobal()
     notify(enabled ? 'Filet de sécurité en maintenance (503).' : 'Filet de sécurité en 404.')
   } catch (err) {
-    notify(errorMessage(err), true)
+    notify(await apiErrorMessage(err), true)
   } finally {
     busy.value = null
   }
@@ -75,7 +78,7 @@ async function removeSite(site: SiteRow) {
     await refreshSites()
     notify(`Route de ${site.host} supprimée.`)
   } catch (err) {
-    notify(errorMessage(err), true)
+    notify(await apiErrorMessage(err), true)
   } finally {
     busy.value = null
   }
@@ -198,6 +201,11 @@ function healthOf(site: SiteRow) {
     <SiteForm v-if="formOpen" :site="editing" @saved="onSaved" @close="formOpen = false" />
     <ProjectForm v-if="projectOpen" @created="onProjectCreated" @close="onProjectClosed" />
 
+    <div v-if="sessionExpired" class="session" role="alert">
+      <span>Ta session a expiré : les modifications ne sont plus enregistrées.</span>
+      <button class="btn btn-primary" @click="reload">Recharger et se reconnecter</button>
+    </div>
+
     <Transition name="toast">
       <div v-if="toast" class="toast" :class="{ error: toast.error }" role="status">{{ toast.message }}</div>
     </Transition>
@@ -280,6 +288,14 @@ h2 { font-size: 1rem; color: var(--text-strong); font-weight: 600; }
   .maint, .actions { grid-column: 2; }
 }
 
+.session {
+  position: fixed; left: 50%; top: 1rem; transform: translateX(-50%); z-index: 20;
+  width: min(560px, calc(100% - 2rem));
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  padding: 0.75rem 1rem; border-radius: 10px;
+  background: #2b2111; border: 1px solid rgba(245, 176, 65, 0.5); color: var(--warn);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font-size: 0.9rem;
+}
 .toast {
   position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
   max-width: calc(100% - 2rem);
