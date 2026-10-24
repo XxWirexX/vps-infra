@@ -25,6 +25,29 @@ De son côté, le panel crée la route `site-<id>.yml` vers le conteneur `<id>`,
 **Programme (sans web)** : pas de sous-domaine, il démarre avec un compose de démo à remplacer.
 Ensuite, chaque push sur `main` redéploie le projet tout seul.
 
+## Importer un repo existant
+
+Onglet **Importer un repo GitHub** du panel : pour un projet qui existe déjà sur GitHub
+(`nom-du-repo` pour un repo de `XxWirexX`, ou `proprietaire/nom-du-repo`).
+
+1. Clone le repo dans `~/projects/<id>`, sur sa branche principale (pas forcément `main`)
+2. Devine son type et ajoute **seulement ce qui manque** (jamais de fichier remplacé) :
+   Dockerfile et `.dockerignore` (voir `templates/_import/`), `docker-compose.yml`, workflow de déploiement
+   (`deploy-vps.yml` si un `deploy.yml` existe déjà). Ces ajouts sont commités et poussés dans le repo :
+   pense à faire un `git pull` sur ton PC.
+3. Crée le `.env` du serveur à partir du `.env.example` s'il y en a un (à remplir ensuite)
+4. Clés, secrets et premier déploiement, comme pour un nouveau projet
+5. Le panel crée la route une fois le port connu : celui du formulaire, sinon celui du type détecté,
+   sinon l'`EXPOSE` du Dockerfile
+
+Si le repo a déjà son `docker-compose.yml`, il est gardé tel quel : pour qu'il soit joignable,
+son conteneur doit s'appeler `<id>` et être sur le réseau `proxy`.
+
+## Déploiement raté
+
+Si le premier déploiement échoue (Dockerfile à adapter, variable manquante dans le `.env`…), le projet
+n'est pas annulé : le repo, les clés et la CD sont en place. Corrige le repo et pousse, la CD redéploie.
+
 ## Installation
 
 ### 1. Le token GitHub

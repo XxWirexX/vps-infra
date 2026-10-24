@@ -1,0 +1,19 @@
+# Conteneur de démo : il répond sur le port choisi à la création (__PROJECT_PORT__),
+# pour vérifier que la route https://__PROJECT_HOST__ fonctionne.
+# Remplace-le par ton application (voir README.md), puis push : la CD redéploie.
+services:
+  app:
+    image: traefik/whoami
+    command: ["--port", "__PROJECT_PORT__"]
+    # build: .    <- avec ton propre Dockerfile, à la place des deux lignes du dessus
+    container_name: __PROJECT_ID__
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

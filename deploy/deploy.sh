@@ -28,7 +28,7 @@ flock 9
 
 cd "$DIR"
 echo "▶ Récupération du code"
-git pull --ff-only origin main
+git pull --ff-only   # branche suivie (main, ou la branche principale du repo importé)
 
 echo "▶ Construction des images"
 docker compose build

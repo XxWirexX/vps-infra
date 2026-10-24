@@ -5,7 +5,7 @@ name: Déploiement
 #   ~/infra/deploy/deploy.sh __PROJECT_ID__
 on:
   push:
-    branches: [main]
+    branches: [__PROJECT_BRANCH__]
   workflow_dispatch:
 
 concurrency: deploy

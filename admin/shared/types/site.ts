@@ -33,6 +33,8 @@ export interface ProjectTemplate {
   port: number
   /** false : programme sans web (pas de sous-domaine ni de route) */
   web: boolean
+  /** true : le port est choisi dans le formulaire (modèle « Autre stack ») */
+  customPort: boolean
 }
 
 /** Avancement d'une création de projet */
@@ -41,6 +43,20 @@ export interface ProjectJob {
   project: string
   status: 'running' | 'done' | 'failed'
   log: string[]
-  result: { repo: string; clone: string; host: string | null } | null
+  result: {
+    repo: string
+    clone: string
+    host: string | null
+    /** Le premier déploiement a échoué, mais tout le reste est en place */
+    warning?: string | null
+    /** Import : type de projet détecté, fichiers ajoutés au repo */
+    kind?: string
+    added?: string[]
+    /** Import : route à créer une fois le port connu */
+    route?: { container: string; port: number } | null
+  } | null
   error: string | null
+  /** Ajouté par le panel : la route du sous-domaine a été créée */
+  routeCreated?: boolean
+  routeError?: string
 }

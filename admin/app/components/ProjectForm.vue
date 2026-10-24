@@ -21,21 +21,43 @@ onMounted(async () => {
 })
 
 // ── Formulaire ──
-const form = reactive({ name: '', id: '', template: '', subdomain: '' })
+// mode "template" : nouveau repo à partir d'un modèle ; "import" : repo GitHub existant
+const mode = ref<'template' | 'import'>('template')
+const form = reactive({
+  name: '', id: '', template: '', subdomain: '', repo: '', web: true,
+  // Port du modèle « Autre stack », et port de l'import (vide = auto)
+  port: '' as string | number,
+  importPort: '' as string | number,
+})
 const idTouched = ref(false)
 const subTouched = ref(false)
-watch(() => form.name, (name) => {
-  const slug = name
+const nameTouched = ref(false)
+
+function slugify(value: string) {
+  return value
     .toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 32)
+}
+watch(() => form.name, (name) => {
+  const slug = slugify(name)
   if (!idTouched.value) form.id = slug
   if (!subTouched.value) form.subdomain = slug
 })
+// À l'import, le nom se déduit du repo tant qu'on ne l'a pas modifié
+watch(() => form.repo, (repo) => {
+  if (nameTouched.value) return
+  form.name = repo.split('/').pop() ?? ''
+})
+
 const selected = computed(() => templates.value.find((t) => t.id === form.template))
-const isWeb = computed(() => selected.value?.web !== false)
+const isWeb = computed(() => (mode.value === 'import' ? form.web : selected.value?.web !== false))
+const askPort = computed(() => mode.value === 'import' ? form.web : !!selected.value?.customPort)
+watch(selected, (t) => {
+  if (t?.customPort && !form.port) form.port = t.port
+})
 const preview = computed(() => (form.subdomain ? `${form.subdomain}.${domain}` : domain))
 
 const submitting = ref(false)
@@ -51,7 +73,10 @@ async function refreshJob(id: string) {
     job.value = await $fetch<ProjectJob>(`/api/jobs/${id}`)
     await nextTick()
     logBox.value?.scrollTo({ top: logBox.value.scrollHeight })
-    if (job.value.status !== 'running') clearInterval(poll)
+    if (job.value.status !== 'running') {
+      clearInterval(poll)
+      emit('created') // la route d'un import n'existe qu'à la fin
+    }
   } catch {
     /* l'agent peut être occupé, on réessaie au prochain tour */
   }
@@ -61,8 +86,18 @@ async function submit() {
   submitting.value = true
   error.value = ''
   try {
-    const res = await $fetch<{ job: string }>('/api/projects', { method: 'POST', body: { ...form } })
-    emit('created') // la route existe déjà : on rafraîchit la liste derrière
+    const raw = mode.value === 'import' ? form.importPort : form.port
+    const port = raw === '' ? null : Number(raw)
+    const res = mode.value === 'import'
+      ? await $fetch<{ job: string }>('/api/imports', {
+          method: 'POST',
+          body: { repo: form.repo, id: form.id, name: form.name, web: form.web, subdomain: form.subdomain, port },
+        })
+      : await $fetch<{ job: string }>('/api/projects', {
+          method: 'POST',
+          body: { id: form.id, name: form.name, template: form.template, subdomain: form.subdomain, port },
+        })
+    emit('created')
     job.value = { id: res.job, project: form.id, status: 'running', log: [], result: null, error: null }
     poll = setInterval(() => refreshJob(res.job), 1000)
     refreshJob(res.job)
@@ -82,11 +117,19 @@ async function copyClone() {
   setTimeout(() => (copied.value = false), 1500)
 }
 
+const title = computed(() => {
+  if (!job.value) return ''
+  const verb = mode.value === 'import' ? 'Import' : 'Création'
+  if (job.value.status === 'running') return `${verb} en cours…`
+  if (job.value.status === 'failed') return `${verb} échoué${mode.value === 'import' ? '' : 'e'}`
+  return job.value.result?.warning ? 'Projet en place, déploiement à corriger' : 'Projet prêt'
+})
+
 const dialog = ref<HTMLDialogElement>()
 function close() {
   // Pendant la création, on évite de fermer par erreur : le travail continue
   // côté serveur, mais on perdrait le journal.
-  if (job.value?.status === 'running' && !confirm('La création continue sur le serveur. Fermer quand même ?')) return
+  if (job.value?.status === 'running' && !confirm('Le travail continue sur le serveur. Fermer quand même ?')) return
   dialog.value?.close()
 }
 </script>
@@ -101,12 +144,26 @@ function close() {
       <p v-if="loadError" class="error" role="alert">{{ loadError }}</p>
 
       <template v-else>
-        <label>
-          <span>Nom</span>
-          <input v-model="form.name" type="text" required maxlength="60" placeholder="Mon blog" autofocus>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" :aria-selected="mode === 'template'" :class="{ active: mode === 'template' }" @click="mode = 'template'">
+            Depuis un modèle
+          </button>
+          <button type="button" role="tab" :aria-selected="mode === 'import'" :class="{ active: mode === 'import' }" @click="mode = 'import'">
+            Importer un repo GitHub
+          </button>
+        </div>
+
+        <label v-if="mode === 'import'">
+          <span>Repo GitHub <small>— nom-du-repo, ou proprietaire/nom-du-repo</small></span>
+          <input v-model="form.repo" type="text" required maxlength="140" placeholder="portfolio" autofocus>
         </label>
 
-        <fieldset>
+        <label>
+          <span>Nom</span>
+          <input v-model="form.name" type="text" required maxlength="60" placeholder="Mon blog" @input="nameTouched = true">
+        </label>
+
+        <fieldset v-if="mode === 'template'">
           <legend>Modèle</legend>
           <div class="templates">
             <label v-for="t in templates" :key="t.id" class="tpl" :class="{ selected: form.template === t.id }">
@@ -117,29 +174,44 @@ function close() {
           </div>
         </fieldset>
 
-        <div class="row">
+        <label>
+          <span>Identifiant <small>— {{ mode === 'import' ? 'dossier et conteneur sur le serveur' : 'repo, dossier et conteneur' }}</small></span>
+          <input v-model="form.id" type="text" required maxlength="32" pattern="[a-z0-9-]+" @input="idTouched = true">
+        </label>
+
+        <label v-if="mode === 'import'" class="check">
+          <input v-model="form.web" type="checkbox">
+          <span>Exposer sur le web <small>— décoche pour un bot, un worker, un script</small></span>
+        </label>
+
+        <div v-if="isWeb" class="row">
           <label class="grow">
-            <span>Identifiant <small>— repo, dossier et conteneur</small></span>
-            <input v-model="form.id" type="text" required maxlength="32" pattern="[a-z0-9-]+" @input="idTouched = true">
+            <span>Sous-domaine <small>— vide pour la racine</small></span>
+            <div class="suffix">
+              <input v-model="form.subdomain" type="text" maxlength="63" @input="subTouched = true">
+              <span class="mono">.{{ domain }}</span>
+            </div>
+            <span class="hint mono">→ https://{{ preview }}</span>
+          </label>
+          <label v-if="askPort" class="port">
+            <span>Port</span>
+            <input v-if="mode === 'import'" v-model="form.importPort" type="number" min="1" max="65535" placeholder="auto">
+            <input v-else v-model="form.port" type="number" min="1" max="65535" required>
           </label>
         </div>
-
-        <label v-if="isWeb">
-          <span>Sous-domaine <small>— vide pour la racine</small></span>
-          <div class="suffix">
-            <input v-model="form.subdomain" type="text" maxlength="63" @input="subTouched = true">
-            <span class="mono">.{{ domain }}</span>
-          </div>
-          <span class="hint mono">→ https://{{ preview }}</span>
-        </label>
-        <p v-else class="hint">
+        <p v-else-if="mode === 'template'" class="hint">
           Pas de sous-domaine : le programme n'est pas exposé sur le web. Il démarre avec un
           <code>docker-compose.yml</code> de démo, à remplacer par le tien (le README du repo explique comment).
         </p>
 
-        <p class="hint">
+        <p v-if="mode === 'template'" class="hint">
           L'agent crée le repo privé <code>{{ form.id || '…' }}</code> sur GitHub, les clés de déploiement,
           lance le projet et branche la CD : chaque push sur <code>main</code> redéploiera.
+        </p>
+        <p v-else class="hint">
+          L'agent clone le repo, devine son type (Nuxt, Node, Vite/Astro, Python, HTML…) et y ajoute
+          <strong>seulement ce qui manque</strong> pour le déployer : Dockerfile, <code>docker-compose.yml</code>, workflow.
+          Il ne remplace jamais un fichier existant. Laisse le port sur « auto » pour celui du type détecté.
         </p>
       </template>
 
@@ -148,22 +220,31 @@ function close() {
       <div class="actions">
         <button type="button" class="btn" @click="close">Annuler</button>
         <button type="submit" class="btn btn-primary" :disabled="submitting || !!loadError || !templates.length">
-          {{ submitting ? 'Lancement…' : 'Créer le projet' }}
+          {{ submitting ? 'Lancement…' : mode === 'import' ? 'Importer' : 'Créer le projet' }}
         </button>
       </div>
     </form>
 
-    <!-- Étape 2 : journal de création -->
+    <!-- Étape 2 : journal -->
     <div v-else class="body">
       <h2>
-        <span class="status" :class="job.status" />
-        {{ job.status === 'running' ? 'Création en cours…' : job.status === 'done' ? 'Projet prêt' : 'La création a échoué' }}
+        <span class="status" :class="job.result?.warning ? 'warn' : job.status" />
+        {{ title }}
       </h2>
 
       <pre ref="logBox" class="log">{{ job.log.join('\n') || '…' }}</pre>
 
+      <p v-if="job.result?.warning" class="warning">{{ job.result.warning }}</p>
+      <p v-if="job.routeError" class="error">Route non créée : {{ job.routeError }} Ajoute-la avec « + Site existant ».</p>
+
       <div v-if="job.result" class="success">
-        <p v-if="job.result.host">En ligne sur <a :href="`https://${job.result.host}`" target="_blank" rel="noopener">https://{{ job.result.host }}</a></p>
+        <p v-if="job.result.host && !job.result.warning">
+          En ligne sur <a :href="`https://${job.result.host}`" target="_blank" rel="noopener">https://{{ job.result.host }}</a>
+        </p>
+        <p v-if="job.result.added?.length" class="hint">
+          Ajouté au repo : <code v-for="f in job.result.added" :key="f">{{ f }}</code>
+          — pense à faire un <code>git pull</code> dans ton clone.
+        </p>
         <p>Sur ton PC :</p>
         <div class="clone">
           <code>{{ job.result.clone }}</code>
@@ -172,7 +253,7 @@ function close() {
         <p class="hint"><a :href="job.result.repo" target="_blank" rel="noopener">Voir le repo sur GitHub</a></p>
       </div>
 
-      <p v-if="job.status === 'failed'" class="hint">
+      <p v-if="job.status === 'failed' && mode === 'template'" class="hint">
         La route du sous-domaine a été créée : supprime-la depuis la liste des sites si tu abandonnes ce projet.
       </p>
 
@@ -203,6 +284,7 @@ small { color: var(--muted); font-weight: 400; }
 .suffix span { color: var(--muted); white-space: nowrap; }
 .row { display: flex; gap: 0.75rem; }
 .grow { flex: 1; }
+.port { width: 6.5rem; }
 .hint { font-size: 0.8rem; color: var(--muted); }
 .hint a, .success a { color: var(--accent); }
 code { background: #111; border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.3rem; }
@@ -241,6 +323,23 @@ code { background: #111; border: 1px solid var(--border); border-radius: 4px; pa
 .status.running { animation: pulse 1s ease-in-out infinite; }
 .status.done { background: var(--ok); }
 .status.failed { background: var(--danger); }
+.status.warn { background: var(--warn); }
+
+.tabs { display: flex; gap: 0.25rem; padding: 0.25rem; background: #111; border: 1px solid var(--border); border-radius: 10px; }
+.tabs button {
+  flex: 1; padding: 0.5rem 0.75rem; border: 0; border-radius: 7px;
+  background: transparent; color: var(--muted); font-weight: 500;
+}
+.tabs button.active { background: #262626; color: var(--text-strong); }
+.tabs button:hover:not(.active) { color: var(--text); }
+.check { flex-direction: row; align-items: center; gap: 0.6rem; cursor: pointer; }
+.check input { width: 1rem; height: 1rem; accent-color: var(--accent); }
+.warning {
+  font-size: 0.85rem; color: var(--warn);
+  background: rgba(245, 176, 65, 0.1); border: 1px solid rgba(245, 176, 65, 0.3);
+  border-radius: 8px; padding: 0.6rem 0.8rem;
+}
+.success code + code { margin-left: 0.3rem; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 
 .success { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; }

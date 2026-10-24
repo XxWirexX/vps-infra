@@ -22,9 +22,10 @@ export default defineEventHandler(async (event) => {
 
   return updateSites(async (sites) => {
     // Même validation qu'un site : identifiant libre, sous-domaine valide et non pris.
-    // Le conteneur porte le nom du projet, le port vient du modèle.
+    // Le conteneur porte le nom du projet, le port vient du modèle (ou du formulaire pour « Autre stack »).
+    const port = template.customPort ? body.port : template.port
     const input = parseSiteInput(
-      { id: body.id, name: body.name, subdomain: body.subdomain, container: body.id, port: template.port },
+      { id: body.id, name: body.name, subdomain: body.subdomain, container: body.id, port },
       sites,
     )
 
@@ -33,6 +34,7 @@ export default defineEventHandler(async (event) => {
       name: input.name,
       template: template.id,
       subdomain: input.subdomain,
+      port: input.port,
     })
 
     const now = new Date().toISOString()

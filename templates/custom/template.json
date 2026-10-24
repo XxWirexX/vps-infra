@@ -1,0 +1,8 @@
+{
+  "label": "Autre stack (vide)",
+  "description": "N'importe quel langage : CD et route en place, un conteneur de démo à remplacer",
+  "web": true,
+  "port": 3000,
+  "customPort": true,
+  "order": 99
+}

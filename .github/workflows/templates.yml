@@ -5,7 +5,7 @@ name: Modèles de projet
 # ici, et pas au moment de créer un projet depuis le panel.
 on:
   push:
-    paths: ["templates/**", ".github/workflows/templates.yml"]
+    paths: ["templates/**", "agent/agent.py", ".github/workflows/templates.yml"]
   pull_request:
     paths: ["templates/**"]
   workflow_dispatch:
@@ -38,3 +38,53 @@ jobs:
           cd templates/program
           sed -i 's/__PROJECT_ID__/ci-test/g; s/__PROJECT_NAME__/CI/g' docker-compose.yml
           docker compose config --quiet
+
+  # Modèle « Autre stack » : compose valide
+  custom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cd templates/custom
+          sed -i 's/__PROJECT_ID__/ci-test/g; s/__PROJECT_PORT__/8080/g' docker-compose.yml
+          docker network create proxy
+          docker compose config --quiet
+
+  # Dockerfiles ajoutés à l'import : construits sur de petits projets d'exemple,
+  # en passant par la vraie détection de l'agent (agent.py).
+  import:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [static, python, node, spa]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: projet d'exemple
+        run: |
+          mkdir -p /tmp/p && cd /tmp/p
+          case "${{ matrix.kind }}" in
+            static) echo '<h1>ok</h1>' > index.html ;;
+            python) echo 'print("ok")' > main.py; touch requirements.txt ;;
+            node)   npm init -y >/dev/null && npm pkg set scripts.start="node index.js" \
+                      && echo 'require("http").createServer((q,r)=>r.end("ok")).listen(3000)' > index.js \
+                      && npm install --package-lock-only >/dev/null ;;
+            spa)    npm init -y >/dev/null && npm pkg set scripts.build="vite build" \
+                      && npm install -D vite >/dev/null && echo '<h1>ok</h1>' > index.html ;;
+          esac
+      - name: détection + fichiers ajoutés par l'agent
+        run: |
+          INFRA_DIR=$GITHUB_WORKSPACE python3 - <<'PY'
+          import importlib.util, pathlib
+          spec = importlib.util.spec_from_file_location("agent", "agent/agent.py")
+          a = importlib.util.module_from_spec(spec); spec.loader.exec_module(a)
+          class Job:
+              def write(self, line): print(line)
+          root = pathlib.Path("/tmp/p")
+          kind, main = a.detect_kind(root)
+          assert kind == "${{ matrix.kind }}", f"type détecté : {kind}"
+          a.add_missing_files(Job(), root, "ci-test", kind, web=False, branch="main", python_main=main)
+          PY
+      - run: docker build /tmp/p

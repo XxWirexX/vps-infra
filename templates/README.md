@@ -20,3 +20,8 @@ et `"web": false` pour un programme sans interface web (pas de sous-domaine ni d
 
 Pour un modèle web, le conteneur exposé doit s'appeler `__PROJECT_ID__` et être sur le réseau `proxy`.
 Pour `program/`, `__PROJECT_HOST__` est remplacé par une chaîne vide.
+
+Modèles génériques : `program/` (sans web) et `custom/` (« Autre stack », port choisi dans le panel,
+remplacé par `__PROJECT_PORT__`). `order` dans `template.json` les range en fin de liste.
+
+`_import/` contient les Dockerfiles ajoutés à l'import d'un repo existant (voir `_import/README.md`).
