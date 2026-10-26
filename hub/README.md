@@ -2,6 +2,11 @@
 
 `https://hub.wireredblue.xyz` : la page qui liste tous les sites.
 
+En attendant le portfolio, le hub est aussi servi à la **racine** (`https://wireredblue.xyz`) : c'est
+cette version qui est indexée par Google (`hub.` est en `noindex`, avec un lien canonique vers la racine).
+Dès qu'un site est ajouté à la racine dans le panel, il passe devant automatiquement (priorité 100 contre 50).
+`www.wireredblue.xyz` redirige vers la racine (`traefik/dynamic/00-www.yml`).
+
 - **Public** : les sites marqués « Public » dans le panel admin.
 - **Une fois connecté au portier** : en plus, les sites « Privé » et les outils (admin, portier).
 - Les sites « Masqué » n'apparaissent jamais.

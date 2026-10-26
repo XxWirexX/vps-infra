@@ -15,8 +15,11 @@ services:
     labels:
       # Public : pas de middleware portier. Les sites privés ne sont affichés
       # qu'après vérification de la session auprès du portier.
+      # Servi aussi à la racine du domaine, en attendant le portfolio : un site ajouté
+      # à la racine dans le panel (priorité 100) passera automatiquement devant.
       - traefik.enable=true
-      - traefik.http.routers.hub.rule=Host(`hub.wireredblue.xyz`)
+      - traefik.http.routers.hub.rule=Host(`hub.wireredblue.xyz`) || Host(`wireredblue.xyz`)
+      - traefik.http.routers.hub.priority=50
       - traefik.http.routers.hub.entrypoints=websecure
       - traefik.http.services.hub.loadbalancer.server.port=3000
 

@@ -1,0 +1,16 @@
+# www.wireredblue.xyz → wireredblue.xyz (redirection permanente),
+# pour éviter que Google voie deux versions du même site.
+http:
+  routers:
+    www-redirect:
+      rule: Host(`www.wireredblue.xyz`)
+      entryPoints: [websecure]
+      middlewares: [www-to-apex]
+      service: noop@internal
+      priority: 1000
+  middlewares:
+    www-to-apex:
+      redirectRegex:
+        regex: "^https?://www\\.wireredblue\\.xyz(.*)"
+        replacement: "https://wireredblue.xyz${1}"
+        permanent: true

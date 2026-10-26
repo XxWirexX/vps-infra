@@ -75,7 +75,11 @@ app.get('/', async (c) => {
   const publicSites = sites.filter((s) => s.visibility === 'public')
   const privateSites = loggedIn ? sites.filter((s) => s.visibility === 'private') : []
   const health = await healthOf([...publicSites, ...privateSites])
-  const loginUrl = `https://auth.${DOMAIN}/?rd=${encodeURIComponent(`https://hub.${DOMAIN}/`)}`
+  // À la racine du domaine, la page est indexable ; sur hub.<domaine>, c'est un doublon : pas d'indexation
+  const host = (c.req.header('x-forwarded-host') || c.req.header('host') || '').split(':')[0].toLowerCase()
+  const atRoot = host === DOMAIN
+  const selfUrl = `https://${atRoot ? DOMAIN : `hub.${DOMAIN}`}/`
+  const loginUrl = `https://auth.${DOMAIN}/?rd=${encodeURIComponent(selfUrl)}`
 
   c.header('Cache-Control', 'private, no-store')
   c.header('Vary', 'Cookie')
@@ -87,8 +91,10 @@ app.get('/', async (c) => {
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>Hub · {DOMAIN}</title>
+            <title>{atRoot ? `${DOMAIN} · projets` : `Hub · ${DOMAIN}`}</title>
             <meta name="description" content={`Les projets en ligne sur ${DOMAIN}.`} />
+            <link rel="canonical" href={`https://${DOMAIN}/`} />
+            {atRoot ? null : <meta name="robots" content="noindex" />}
             <meta name="color-scheme" content="dark" />
             <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f8ef7'/%3E%3Cpath d='M9 9h4v14H9zM19 9h4v14h-4zM13 14h6v4h-6z' fill='white'/%3E%3C/svg%3E" />
             <link rel="stylesheet" href="/static/style.css" />
@@ -134,6 +140,9 @@ app.get('/', async (c) => {
 })
 
 app.get('/health', (c) => c.json({ ok: true }))
+
+// Tout est autorisé : l'absence de robots.txt fonctionne aussi, mais évite des 404 dans la Search Console
+app.get('/robots.txt', (c) => c.text('User-agent: *\nAllow: /\n'))
 
 app.notFound((c) => c.text('Page introuvable', 404))
 
